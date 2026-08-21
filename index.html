@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelScrape — Autonomous Scraping Trust Layer & Observability Platform</title>
+    
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel Standalone -->
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter, Geist, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        geist: ['Geist', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            950: '#030712',
+                            900: '#0F172A',
+                            800: '#1E293B',
+                            700: '#334155',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'beam': 'beam 2s linear infinite',
+                        'scanline': 'scanline 6s linear infinite',
+                        'shutter-down': 'shutterDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'shutter-up': 'shutterUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'beacon-glow': 'beaconGlow 1s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        beam: {
+                            '0%': { transform: 'translateX(-100%)', opacity: '0' },
+                            '50%': { opacity: '1' },
+                            '100%': { transform: 'translateX(100%)', opacity: '0' }
+                        },
+                        shutterDown: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(0%)' }
+                        },
+                        shutterUp: {
+                            '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0%)' }
+                        },
+                        beaconGlow: {
+                            '0%': { opacity: '0.2', boxShadow: '0 0 10px #F43F5E' },
+                            '100%': { opacity: '0.9', boxShadow: '0 0 40px #F43F5E' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #030712;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        
+        .font-geist { font-family: 'Geist', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* THEME PRESET STYLING VARIABLES */
+        .theme-cyan {
+            --accent-color: #06B6D4;
+            --accent-glow: rgba(6, 182, 212, 0.25);
+            --card-border: rgba(6, 182, 212, 0.2);
+        }
+        .theme-cyberpunk {
+            --accent-color: #E11D48;
+            --accent-glow: rgba(225, 29, 72, 0.3);
+            --card-border: rgba(225, 29, 72, 0.3);
+        }
+        .theme-matrix {
+            --accent-color: #10B981;
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --card-border: rgba(16, 185, 129, 0.3);
+        }
+        .theme-void {
+            --accent-color: #A855F7;
+            --accent-glow: rgba(168, 85, 247, 0.3);
+            --card-border: rgba(168, 85, 247, 0.3);
+        }
+
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+            border-radius: 20px;
+            transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+            transform-style: preserve-3d;
+        }
+
+        .glass-card:hover {
+            border-color: var(--accent-color, #06B6D4);
+            box-shadow: 0 20px 40px -15px var(--accent-glow, rgba(6, 182, 212, 0.2));
+        }
+
+        /* CRT Scanline Overlay */
+        .crt-scanlines {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+            background-size: 100% 4px;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0.35;
+        }
+
+        /* 3D Grid Plane */
+        .cyber-grid-plane {
+            position: fixed;
+            bottom: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image: 
+                linear-gradient(to right, rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(6, 182, 212, 0.06) 1px, transparent 1px);
+            background-size: 40px 40px;
+            transform: perspective(600px) rotateX(65deg);
+            animation: gridScroll 18s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes gridScroll {
+            0% { transform: perspective(600px) rotateX(65deg) translateY(0); }
+            100% { transform: perspective(600px) rotateX(65deg) translateY(40px); }
+        }
+
+        /* Mechanical Shutter Overlay */
+        .shutter-blade-top {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50vh;
+            background: linear-gradient(180deg, #090D16 80%, #F43F5E 100%);
+            border-bottom: 4px solid #F43F5E;
+            box-shadow: 0 0 40px #F43F5E;
+            z-index: 60;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .shutter-blade-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 50vh;
+            background: linear-gradient(0deg, #090D16 80%, #F43F5E 100%);
+            border-top: 4px solid #F43F5E;
+            box-shadow: 0 0 40px #F43F5E;
+            z-index: 60;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Streams */
+        .particle-stream {
+            background: linear-gradient(90deg, transparent, #06B6D4, #10B981, transparent);
+            box-shadow: 0 0 20px #06B6D4, 0 0 35px #10B981;
+        }
+        .particle-stream-red {
+            background: linear-gradient(90deg, transparent, #F43F5E, transparent);
+            box-shadow: 0 0 20px #F43F5E;
+        }
+
+        .gauge-circle {
+            transition: stroke-dashoffset 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen relative antialiased selection:bg-cyan-500/30 selection:text-cyan-200 theme-cyan">
+    
+    <!-- 3D CYBER GRID BACKGROUND -->
+    <div class="cyber-grid-plane"></div>
+
+    <!-- CANVAS INTERACTIVE MATRIX & PARTICLE RAIN -->
+    <canvas id="cyber-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40"></canvas>
+
+    <!-- CRT SCANLINE OVERLAY -->
+    <div id="crt-overlay" class="crt-scanlines hidden"></div>
+
+    <!-- MECHANICAL SHUTTER OVERLAY (TRIGGERS ON TRUST GATE SLAM) -->
+    <div id="shutter-top" class="shutter-blade-top -translate-y-full flex items-end justify-center pb-4">
+        <span class="font-mono text-sm font-black text-white tracking-widest uppercase bg-rose-950 px-4 py-1 rounded border border-rose-500 shadow-xl">
+            🛑 EMERGENCY TRUST GATE INTERACTION SHUTTER
+        </span>
+    </div>
+    <div id="shutter-bottom" class="shutter-blade-bottom translate-y-full flex items-start justify-center pt-4">
+        <span class="font-mono text-xs font-bold text-rose-300 tracking-wider">
+            UNTRUSTED SCRAPE PAYLOAD HALTED BEFORE LLM INGEST
+        </span>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- SPEECH SYNTHESIS VOICE ASSISTANT ---
+        const speakVoiceAlert = (text, enabled = true) => {
+            if (!enabled || !('speechSynthesis' in window)) return;
+            try {
+                window.speechSynthesis.cancel(); // Stop prior speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.pitch = 1.1;
+                utterance.rate = 1.05;
+                utterance.volume = 0.8;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {}
+        };
+
+        // --- CYBER SOUND FX SYNTHESIZER ---
+        const playCyberSFX = (type, enabled = true) => {
+            if (!enabled) return;
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+
+                if (type === 'hover') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(850, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1300, ctx.currentTime + 0.03);
+                    gain.gain.setValueAtTime(0.015, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.03);
+                } else if (type === 'click') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(450, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(950, ctx.currentTime + 0.06);
+                    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.06);
+                } else if (type === 'slam') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(240, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.45);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.45);
+                } else if (type === 'step') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(650, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.08);
+                } else if (type === 'success') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                    notes.forEach((freq, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.07);
+                        gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.07 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + i * 0.07);
+                        osc.stop(ctx.currentTime + i * 0.07 + 0.3);
+                    });
+                }
+            } catch (e) {}
+        };
+
+        // --- ICON COMPONENT ---
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={`inline-block align-middle ${className}`}></i>;
+        };
+
+        // --- MOCK PRESET TARGETS ---
+        const TARGET_PRESETS = [
+            {
+                url: 'https://example.com/product/1001',
+                query: 'Extract user review sentiment, pricing specifications, and seller merchant metrics.',
+                name: 'E-Commerce Target 1001',
+                collectorId: 'c_98a120',
+                brokenField: 'pricing_data',
+                oldSelector: '//div[@id="product-price"]/span',
+                fixedSelector: '//span[@data-test="sale-price"]',
+                sampleValue: '$149.99'
+            },
+            {
+                url: 'https://amazon.com/dp/B08X92K01',
+                query: 'Extract seller metrics, prime status, and ratings history',
+                name: 'Amazon Electronics Catalog',
+                collectorId: 'c_8f2a91',
+                brokenField: 'prime_status',
+                oldSelector: '.a-icon-prime-v2',
+                fixedSelector: '[data-prime-tag="true"]',
+                sampleValue: 'Eligible (One-Day Delivery)'
+            },
+            {
+                url: 'https://bloomberg.com/markets/equities',
+                query: 'Analyze ticker P/E ratio drift and market capitalization',
+                name: 'Bloomberg Financial Data Pipeline',
+                collectorId: 'c_471b02',
+                brokenField: 'pe_ratio',
+                oldSelector: '.security-summary .pe-ratio-val',
+                fixedSelector: 'td[data-stat="pe_ratio_ttm"]',
+                sampleValue: '28.45'
+            }
+        ];
+
+        function App() {
+            // Active View Selection
+            const [activeView, setActiveView] = useState('input');
+
+            // HUD Controls
+            const [soundEnabled, setSoundEnabled] = useState(true);
+            const [voiceEnabled, setVoiceEnabled] = useState(true);
+            const [crtEnabled, setCrtEnabled] = useState(false);
+            const [theme, setTheme] = useState('cyan'); // 'cyan' | 'cyberpunk' | 'matrix' | 'void'
+
+            // Target Inputs
+            const [targetUrl, setTargetUrl] = useState('https://example.com/product/1001');
+            const [extractionQuery, setExtractionQuery] = useState(TARGET_PRESETS[0].query);
+            const [selectedPreset, setSelectedPreset] = useState(TARGET_PRESETS[0]);
+
+            // Reliability & Gate State
+            const [trustScore, setTrustScore] = useState(98.0);
+            const [gateStatus, setGateStatus] = useState('HEALTHY');
+            const [gateOpen, setGateOpen] = useState(true);
+            const [isSimulating, setIsSimulating] = useState(false);
+            const [healingStep, setHealingStep] = useState(0);
+
+            // Time Travel Historical Scrape Run (0..9)
+            const [historicalRun, setHistoricalRun] = useState(9);
+
+            // AI Model Destination
+            const [selectedModel, setSelectedModel] = useState('gemini-1.5-pro');
+
+            // Gemini Interactive RAG Sandbox Query State
+            const [ragQuery, setRagQuery] = useState('Summarize verified consumer complaints & specs');
+            const [ragResponse, setRagResponse] = useState('');
+            const [isRagLoading, setIsRagLoading] = useState(false);
+
+            // Interactive XPath Playground
+            const [customXpath, setCustomXpath] = useState('//span[@data-test="sale-price"]');
+            const [xpathResult, setXpathResult] = useState({ match: true, confidence: 99.4, value: '$149.99' });
+
+            // Log Console Stream
+            const [logs, setLogs] = useState([
+                { time: '14:32:01', level: 'INFO', text: 'Initializing Bright Data Scraper Studio proxy mesh...' },
+                { time: '14:32:02', level: 'SUCCESS', text: 'DOM Schema parsed successfully. Validation score: 98.0%' },
+                { time: '14:32:04', level: 'SUCCESS', text: 'Payload verified clean. Routing to downstream Gemini 1.5 Pro API' }
+            ]);
+
+            const logEndRef = useRef(null);
+
+            // 3D PARALLAX CARD TILT EFFECT ON MOUSEMOVE
+            const handleCardMouseMove = (e) => {
+                const card = e.currentTarget;
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                card.style.transform = `perspective(1000px) rotateX(${-y / 25}deg) rotateY(${x / 25}deg) scale3d(1.01, 1.01, 1.01)`;
+            };
+
+            const handleCardMouseLeave = (e) => {
+                e.currentTarget.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+            };
+
+            // CANVAS MATRIX RAIN & AUDIO EQUALIZER SPECTRUM
+            useEffect(() => {
+                const canvas = document.getElementById('cyber-canvas');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                let animId;
+
+                let w = (canvas.width = window.innerWidth);
+                let h = (canvas.height = window.innerHeight);
+
+                const handleResize = () => {
+                    w = canvas.width = window.innerWidth;
+                    h = canvas.height = window.innerHeight;
+                };
+                window.addEventListener('resize', handleResize);
+
+                const chars = '0101010101010101XYZ01';
+                const fontSize = 12;
+                const columns = Math.floor(w / fontSize);
+                const drops = Array(columns).fill(1);
+
+                const render = () => {
+                    ctx.fillStyle = 'rgba(3, 7, 18, 0.15)';
+                    ctx.fillRect(0, 0, w, h);
+
+                    ctx.fillStyle = gateOpen ? 'rgba(6, 182, 212, 0.35)' : 'rgba(244, 63, 94, 0.45)';
+                    ctx.font = `${fontSize}px JetBrains Mono`;
+
+                    for (let i = 0; i < drops.length; i++) {
+                        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                        if (drops[i] * fontSize > h && Math.random() > 0.975) {
+                            drops[i] = 0;
+                        }
+                        drops[i]++;
+                    }
+                    animId = requestAnimationFrame(render);
+                };
+                render();
+
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                    cancelAnimationFrame(animId);
+                };
+            }, [gateOpen]);
+
+            // Auto Scroll Log
+            useEffect(() => {
+                if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            }, [logs]);
+
+            // Helper to add log line
+            const addLog = (level, text) => {
+                const now = new Date();
+                const timeStr = now.toTimeString().split(' ')[0];
+                setLogs(prev => [...prev.slice(-40), { time: timeStr, level, text }]);
+            };
+
+            // Switch Theme Presets
+            const changeTheme = (newTheme) => {
+                setTheme(newTheme);
+                document.body.className = `bg-slate-950 text-slate-100 min-h-screen relative antialiased theme-${newTheme}`;
+                playCyberSFX('click', soundEnabled);
+            };
+
+            // Preset Selector
+            const handlePresetSelect = (preset) => {
+                setSelectedPreset(preset);
+                setTargetUrl(preset.url);
+                setExtractionQuery(preset.query);
+                setCustomXpath(preset.fixedSelector);
+                addLog('INFO', `Target switched to ${preset.name} (${preset.url})`);
+            };
+
+            // Run Scrape Analysis
+            const runAnalysis = () => {
+                playCyberSFX('click', soundEnabled);
+                addLog('INFO', `▶ Executing Bright Data scraper on ${targetUrl}...`);
+                speakVoiceAlert("Analysis started. Scrape ingested.", voiceEnabled);
+                setTimeout(() => {
+                    addLog('SUCCESS', `Scrape complete. Sentinel Trust Score evaluated at ${trustScore.toFixed(1)}%.`);
+                }, 600);
+            };
+
+            // Trigger Mechanical Shutter & Auto-Healing Simulation
+            const triggerAnomalySimulation = () => {
+                if (isSimulating) return;
+                setIsSimulating(true);
+                playCyberSFX('slam', soundEnabled);
+                speakVoiceAlert("Alert. DOM Mutation detected. Trust gate closed.", voiceEnabled);
+
+                // Animate Dual-Blade Mechanical Shutters
+                const topShutter = document.getElementById('shutter-top');
+                const bottomShutter = document.getElementById('shutter-bottom');
+                if (topShutter && bottomShutter) {
+                    topShutter.classList.remove('-translate-y-full');
+                    bottomShutter.classList.remove('translate-y-full');
+                    setTimeout(() => {
+                        topShutter.classList.add('-translate-y-full');
+                        bottomShutter.classList.add('translate-y-full');
+                    }, 900);
+                }
+
+                // Step 1: Drop Score, Divert Gate
+                setTrustScore(42.0);
+                setGateStatus('DIVERTED');
+                setGateOpen(false);
+                setHealingStep(1);
+
+                addLog('WARN', `⚠️ CRITICAL: DOM Mutation detected on ${targetUrl}`);
+                addLog('ERROR', `Validation Failure: Field '${selectedPreset.brokenField}' returned null using selector ${selectedPreset.oldSelector}`);
+                addLog('ERROR', `[TRUST GATE SLAMMED SHUT] Trust score dropped to 42.0%. Scrape payload DIVERTED.`);
+
+                const delay = 1300;
+
+                setTimeout(() => {
+                    setHealingStep(2);
+                    setGateStatus('HEALING');
+                    playCyberSFX('step', soundEnabled);
+                    addLog('INFO', `[SELF-HEALING 2/5] Inspecting DOM diffs & CSS mutations...`);
+
+                    setTimeout(() => {
+                        setHealingStep(3);
+                        playCyberSFX('step', soundEnabled);
+                        addLog('WARN', `$ bdata scraper heal --field ${selectedPreset.brokenField} --target ${targetUrl}`);
+
+                        setTimeout(() => {
+                            setHealingStep(4);
+                            playCyberSFX('step', soundEnabled);
+                            addLog('INFO', `[SELF-HEALING 4/5] Auto-repair isolated fallback XPath: '${selectedPreset.fixedSelector}'`);
+
+                            setTimeout(() => {
+                                setHealingStep(5);
+                                setTrustScore(98.3);
+                                setGateStatus('RESTORED');
+                                setGateOpen(true);
+                                playCyberSFX('success', soundEnabled);
+                                speakVoiceAlert("Self healing complete. Reliability restored.", voiceEnabled);
+                                addLog('SUCCESS', `✓ HEALING COMPLETE: Field '${selectedPreset.brokenField}' restored. Trust score updated to 98.3%`);
+                                addLog('SUCCESS', `[TRUST GATE RE-OPENED] Verified clean payload dispatched to ${selectedModel}.`);
+                                setIsSimulating(false);
+                            }, delay);
+                        }, delay);
+                    }, delay);
+                }, delay);
+            };
+
+            // Simulate Gemini AI RAG Query Output
+            const executeGeminiRagQuery = () => {
+                if (isRagLoading) return;
+                setIsRagLoading(true);
+                playCyberSFX('click', soundEnabled);
+                setRagResponse('');
+
+                const fullText = `[GEMINI 1.5 PRO SYNTHESIS RESPONSE]\n\n` +
+                    `✓ Trust-Verified Scrape Payload Ingested (Reliability Score: ${trustScore.toFixed(1)}%)\n` +
+                    `• Target URL: ${targetUrl}\n` +
+                    `• Verified Result: ${selectedPreset.sampleValue}\n` +
+                    `• Integrity Analysis: Zero null-pointer anomalies detected post-auto-heal. Downstream context clean and safe for agentic reasoning.\n\n` +
+                    `Status: Verified safe for Gemini 1.5 Pro Context Window.`;
+
+                let i = 0;
+                const interval = setInterval(() => {
+                    setRagResponse(prev => prev + fullText.charAt(i));
+                    i++;
+                    if (i >= fullText.length) {
+                        clearInterval(interval);
+                        setIsRagLoading(false);
+                        playCyberSFX('success', soundEnabled);
+                    }
+                }, 15);
+            };
+
+            // Evaluate Custom XPath in Playground
+            const testXpathInPlayground = (xpath) => {
+                setCustomXpath(xpath);
+                playCyberSFX('click', soundEnabled);
+                if (xpath.includes('sale-price') || xpath.includes('prime') || xpath.includes('pe_ratio')) {
+                    setXpathResult({ match: true, confidence: 99.4, value: selectedPreset.sampleValue });
+                } else {
+                    setXpathResult({ match: false, confidence: 0.0, value: 'null (Element Not Found)' });
+                }
+            };
+
+            // Colors based on trust score
+            const scoreColor = trustScore >= 90 
+                ? { text: 'text-emerald-400', stroke: '#10B981', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' }
+                : trustScore >= 70
+                ? { text: 'text-amber-400', stroke: '#F59E0B', bg: 'bg-amber-500/10', border: 'border-amber-500/30' }
+                : { text: 'text-rose-400', stroke: '#F43F5E', bg: 'bg-rose-500/10', border: 'border-rose-500/30' };
+
+            // Circular SVG Gauge
+            const gaugeRadius = 70;
+            const gaugeCircumference = 2 * Math.PI * gaugeRadius;
+            const strokeOffset = gaugeCircumference - (trustScore / 100) * gaugeCircumference;
+
+            return (
+                <div className="min-h-screen flex flex-col relative z-10">
+                    
+                    {/* TOP HUD BAR */}
+                    <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 lg:px-6 py-3 flex items-center justify-between shadow-2xl">
+                        <div className="flex items-center gap-6">
+                            {/* Brand Logo */}
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveView('input'); playCyberSFX('click', soundEnabled); }}>
+                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 via-indigo-500 to-emerald-500 p-0.5 shadow-lg shadow-cyan-500/20">
+                                    <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                                        <Icon name="shield-check" size={22} className="text-cyan-400" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h1 className="font-geist font-black text-xl tracking-tight text-white leading-none">
+                                        Sentinel<span className="text-cyan-400">Scrape</span>
+                                    </h1>
+                                    <span className="text-[10px] font-mono text-slate-400">
+                                        Bright Data Trust Engine
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* View Breadcrumbs */}
+                            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-slate-800 text-xs font-mono">
+                                <span className="text-slate-500">Platform</span>
+                                <span className="text-slate-600">/</span>
+                                <span className="text-cyan-400 font-bold uppercase tracking-wider">
+                                    {activeView === 'input' && '1. Command & Trust Center'}
+                                    {activeView === 'lab' && '2. Self-Healing Diagnostic Lab'}
+                                    {activeView === 'gate' && '3. Trust Gate Analysis & Diversion'}
+                                    {activeView === 'hub' && '4. Trust-Verified AI Hub'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Top Controls & Theme Presets */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            {/* Theme Selector */}
+                            <div className="hidden lg:flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-[10px] font-mono">
+                                <button onClick={() => changeTheme('cyan')} className={`px-2 py-0.5 rounded ${theme === 'cyan' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-500'}`}>Cyan</button>
+                                <button onClick={() => changeTheme('cyberpunk')} className={`px-2 py-0.5 rounded ${theme === 'cyberpunk' ? 'bg-rose-500/20 text-rose-300 font-bold' : 'text-slate-500'}`}>Cyber</button>
+                                <button onClick={() => changeTheme('matrix')} className={`px-2 py-0.5 rounded ${theme === 'matrix' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-500'}`}>Matrix</button>
+                                <button onClick={() => changeTheme('void')} className={`px-2 py-0.5 rounded ${theme === 'void' ? 'bg-purple-500/20 text-purple-300 font-bold' : 'text-slate-500'}`}>Void</button>
+                            </div>
+
+                            {/* Speech Voice Toggle */}
+                            <button 
+                                onClick={() => setVoiceEnabled(!voiceEnabled)}
+                                className={`p-2 rounded-xl border ${voiceEnabled ? 'bg-slate-900 border-slate-700 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-600'}`}
+                                title={voiceEnabled ? "Voice Assistant Enabled" : "Voice Muted"}
+                            >
+                                <Icon name={voiceEnabled ? "mic" : "mic-off"} size={16} />
+                            </button>
+
+                            {/* CRT Toggle */}
+                            <button 
+                                onClick={() => {
+                                    setCrtEnabled(!crtEnabled);
+                                    const overlay = document.getElementById('crt-overlay');
+                                    if (overlay) overlay.classList.toggle('hidden');
+                                    playCyberSFX('click', soundEnabled);
+                                }}
+                                className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono ${crtEnabled ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                            >
+                                CRT
+                            </button>
+
+                            {/* Sound Toggle */}
+                            <button 
+                                onClick={() => setSoundEnabled(!soundEnabled)}
+                                className={`p-2 rounded-xl border ${soundEnabled ? 'bg-slate-900 border-slate-700 text-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-600'}`}
+                            >
+                                <Icon name={soundEnabled ? "volume-2" : "volume-x"} size={16} />
+                            </button>
+
+                            {/* Primary Simulation Button */}
+                            <button 
+                                onClick={triggerAnomalySimulation}
+                                disabled={isSimulating}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono tracking-wide uppercase flex items-center gap-2 shadow-xl ${
+                                    isSimulating 
+                                        ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-cyan-500 via-indigo-500 to-emerald-500 text-slate-950 shadow-cyan-500/25'
+                                }`}
+                            >
+                                <Icon name="zap" size={16} className={isSimulating ? "animate-spin text-slate-400" : "fill-slate-950"} />
+                                {isSimulating ? 'Simulating...' : '⚡ Test Auto-Heal'}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* MAIN LAYOUT */}
+                    <div className="flex-1 flex overflow-hidden">
+                        
+                        {/* LEFT SIDEBAR */}
+                        <aside className="w-16 lg:w-64 glass-panel border-r border-slate-800/80 flex flex-col justify-between p-3 shrink-0 z-30">
+                            <div className="space-y-6">
+                                <div className="px-2 pt-2 hidden lg:block text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400">
+                                    Control Views
+                                </div>
+                                <nav className="space-y-2">
+                                    <button
+                                        onClick={() => { setActiveView('input'); playCyberSFX('hover', soundEnabled); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-xs font-bold transition-all ${
+                                            activeView === 'input' 
+                                                ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/10 text-cyan-300 border border-cyan-500/40 shadow-lg' 
+                                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        }`}
+                                    >
+                                        <Icon name="terminal" size={18} className={activeView === 'input' ? 'text-cyan-400' : ''} />
+                                        <span className="hidden lg:inline">Command & Trust</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setActiveView('lab'); playCyberSFX('hover', soundEnabled); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-xs font-bold transition-all ${
+                                            activeView === 'lab' 
+                                                ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/10 text-cyan-300 border border-cyan-500/40 shadow-lg' 
+                                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        }`}
+                                    >
+                                        <Icon name="flask-conical" size={18} className={activeView === 'lab' ? 'text-amber-400' : ''} />
+                                        <span className="hidden lg:inline">Diagnostic Lab</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setActiveView('gate'); playCyberSFX('hover', soundEnabled); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-xs font-bold transition-all relative ${
+                                            activeView === 'gate' 
+                                                ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/10 text-cyan-300 border border-cyan-500/40 shadow-lg' 
+                                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        }`}
+                                    >
+                                        <Icon name="shield-alert" size={18} className={gateStatus === 'DIVERTED' ? 'text-rose-400 animate-pulse' : activeView === 'gate' ? 'text-rose-400' : ''} />
+                                        <span className="hidden lg:inline">Gate & Diversion</span>
+                                        {gateStatus === 'DIVERTED' && (
+                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute right-3 top-4 animate-ping"></span>
+                                        )}
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setActiveView('hub'); playCyberSFX('hover', soundEnabled); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-xs font-bold transition-all ${
+                                            activeView === 'hub' 
+                                                ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/10 text-cyan-300 border border-cyan-500/40 shadow-lg' 
+                                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        }`}
+                                    >
+                                        <Icon name="cpu" size={18} className={activeView === 'hub' ? 'text-emerald-400' : ''} />
+                                        <span className="hidden lg:inline">AI Destination Hub</span>
+                                    </button>
+                                </nav>
+                            </div>
+
+                            <div className="hidden lg:block p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-2">
+                                <div className="flex items-center justify-between text-xs font-mono">
+                                    <span className="text-slate-400">Bright Data</span>
+                                    <span className="text-emerald-400 font-bold">Studio Mesh</span>
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-400 truncate">
+                                    Collector: <span className="text-cyan-300 font-bold">{selectedPreset.collectorId}</span>
+                                </div>
+                            </div>
+                        </aside>
+
+                        {/* VIEW CONTENT MAIN CONTAINER */}
+                        <main className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 max-w-7xl mx-auto w-full pb-32">
+
+                            {/* ========================================================================= */}
+                            {/* VIEW 1: COMMAND & TRUST CENTER                                            */}
+                            {/* ========================================================================= */}
+                            {activeView === 'input' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                                        <div>
+                                            <h2 className="font-geist font-extrabold text-2xl text-white tracking-tight">
+                                                COMMAND & TRUST CENTER
+                                            </h2>
+                                            <p className="text-slate-400 text-xs mt-1">
+                                                Configure web scrape parameters and evaluate real-time validity metrics before passing to LLMs.
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-mono text-slate-400">Preset Target:</span>
+                                            <select 
+                                                onChange={(e) => {
+                                                    const found = TARGET_PRESETS.find(p => p.url === e.target.value);
+                                                    if (found) handlePresetSelect(found);
+                                                }}
+                                                value={targetUrl}
+                                                className="bg-slate-900 border border-slate-700/80 text-cyan-300 text-xs font-mono rounded-xl px-3 py-1.5 outline-none cursor-pointer"
+                                            >
+                                                {TARGET_PRESETS.map(p => (
+                                                    <option key={p.url} value={p.url}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                        {/* Left Card */}
+                                        <div 
+                                            className="lg:col-span-6 glass-card p-6 border border-slate-800 space-y-5"
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                                <h3 className="font-geist font-bold text-sm text-slate-200 flex items-center gap-2">
+                                                    <Icon name="link" size={16} className="text-indigo-400" />
+                                                    Scraper Target & Query Parameters
+                                                </h3>
+                                                <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
+                                                    Input Mode
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-mono text-slate-300 font-semibold flex items-center justify-between">
+                                                    <span>Target Web URL</span>
+                                                    <span className="text-[10px] text-slate-500">Bright Data Scraper Studio</span>
+                                                </label>
+                                                <input 
+                                                    type="text" 
+                                                    value={targetUrl}
+                                                    onChange={(e) => setTargetUrl(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-mono text-slate-300 font-semibold flex items-center justify-between">
+                                                    <span>Prompt / Extraction Query</span>
+                                                    <span className="text-[10px] text-slate-500">Structured Payload Specs</span>
+                                                </label>
+                                                <textarea 
+                                                    rows="3"
+                                                    value={extractionQuery}
+                                                    onChange={(e) => setExtractionQuery(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500 resize-none"
+                                                ></textarea>
+                                            </div>
+
+                                            <button 
+                                                onClick={runAnalysis}
+                                                className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-cyan-500 to-emerald-500 text-slate-950 font-bold font-mono text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25"
+                                            >
+                                                <Icon name="play" size={16} className="fill-slate-950" />
+                                                ▶ RUN ANALYSIS
+                                            </button>
+
+                                            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                                                        <Icon name="shield-check" size={14} className="text-emerald-400" />
+                                                        Sentinel Health Score: <strong className={scoreColor.text}>{trustScore.toFixed(1)}%</strong>
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${scoreColor.bg} ${scoreColor.text} border ${scoreColor.border}`}>
+                                                        ● {trustScore >= 75 ? 'PASSED' : 'DIVERTED'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                                    <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
+                                                        <span className="text-slate-400">Field Completeness:</span>
+                                                        <span className="text-emerald-400 font-bold">100%</span>
+                                                    </div>
+                                                    <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
+                                                        <span className="text-slate-400">Type Validity:</span>
+                                                        <span className="text-emerald-400 font-bold">100%</span>
+                                                    </div>
+                                                    <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
+                                                        <span className="text-slate-400">DOM Fingerprint:</span>
+                                                        <span className={trustScore >= 75 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                                            {trustScore >= 75 ? 'MATCHED' : 'MUTATED'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between">
+                                                        <span className="text-slate-400">Z-Score Drift:</span>
+                                                        <span className="text-cyan-400 font-bold">0.3σ Normal</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Card */}
+                                        <div 
+                                            className="lg:col-span-6 space-y-6"
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="glass-card p-6 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
+                                                <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
+                                                    <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                                                        TRUST SCORE & INTEGRITY
+                                                    </span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`text-4xl font-mono font-extrabold ${scoreColor.text}`}>
+                                                            {trustScore.toFixed(1)}%
+                                                        </span>
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${scoreColor.bg} ${scoreColor.text} border ${scoreColor.border}`}>
+                                                            {trustScore >= 75 ? '✓ VERIFIED' : '🛑 DIVERTED'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 max-w-xs">
+                                                        {trustScore >= 75 ? 'Data passed all assertions cleanly.' : 'Scrape held by Trust Gate.'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
+                                                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                                                        <circle cx="80" cy="80" r="60" stroke="rgba(30, 41, 59, 0.8)" strokeWidth="12" fill="transparent" />
+                                                        <circle 
+                                                            cx="80" 
+                                                            cy="80" 
+                                                            r="60" 
+                                                            stroke={scoreColor.stroke} 
+                                                            strokeWidth="12" 
+                                                            strokeDasharray={2 * Math.PI * 60} 
+                                                            strokeDashoffset={(2 * Math.PI * 60) - (trustScore / 100) * (2 * Math.PI * 60)} 
+                                                            strokeLinecap="round" 
+                                                            fill="transparent" 
+                                                            className="gauge-circle" 
+                                                        />
+                                                    </svg>
+                                                    <span className={`absolute font-mono font-bold text-lg ${scoreColor.text}`}>
+                                                        {trustScore.toFixed(0)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="glass-card p-4 border border-slate-800 rounded-2xl space-y-3 font-mono text-xs">
+                                                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                                    <span className="text-slate-300 font-bold flex items-center gap-2">
+                                                        <Icon name="terminal" size={14} className="text-cyan-400" />
+                                                        SYSTEM ACTIVITY STREAM
+                                                    </span>
+                                                    <button onClick={() => setLogs([])} className="text-[10px] text-slate-500 hover:text-slate-300 bg-slate-900 px-2 py-0.5 rounded">Clear</button>
+                                                </div>
+
+                                                <div className="p-3 bg-slate-950 rounded-xl max-h-56 overflow-y-auto space-y-1.5 text-slate-300 border border-slate-900">
+                                                    {logs.map((l, i) => (
+                                                        <div key={i} className="flex items-start gap-2 leading-relaxed hover:bg-slate-900/50 p-1 rounded">
+                                                            <span className="text-slate-500 text-[10px]">[{l.time}]</span>
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                                                l.level === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                l.level === 'WARN' ? 'bg-amber-500/20 text-amber-300' :
+                                                                l.level === 'ERROR' ? 'bg-rose-500/20 text-rose-400' :
+                                                                'bg-cyan-500/20 text-cyan-300'
+                                                            }`}>
+                                                                {l.level}
+                                                            </span>
+                                                            <span className="text-slate-200 break-all">{l.text}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div ref={logEndRef} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ========================================================================= */}
+                            {/* VIEW 2: THE SELF-HEALING DIAGNOSTIC LAB                                   */}
+                            {/* ========================================================================= */}
+                            {activeView === 'lab' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="glass-card p-5 border border-slate-800 flex items-center justify-between" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div>
+                                                <span className="text-xs font-mono text-slate-400 font-semibold">RELIABILITY SCORE</span>
+                                                <div className={`text-3xl font-mono font-black mt-1 ${scoreColor.text}`}>
+                                                    {trustScore.toFixed(1)}%
+                                                </div>
+                                                <span className="text-[10px] text-slate-500">Threshold: 75.0%</span>
+                                            </div>
+                                            <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                                                <Icon name="activity" size={24} />
+                                            </div>
+                                        </div>
+
+                                        <div className="glass-card p-5 border border-slate-800 flex items-center justify-between" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div>
+                                                <span className="text-xs font-mono text-slate-400 font-semibold">DATA PARTICLES</span>
+                                                <div className="text-3xl font-mono font-black text-cyan-400 mt-1">
+                                                    {trustScore >= 75 ? '15 / 15' : '14 / 15'}
+                                                </div>
+                                                <span className="text-[10px] text-slate-500">Fields Extracted Cleanly</span>
+                                            </div>
+                                            <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                                                <Icon name="database" size={24} />
+                                            </div>
+                                        </div>
+
+                                        <div className="glass-card p-5 border border-slate-800 flex items-center justify-between" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div>
+                                                <span className="text-xs font-mono text-slate-400 font-semibold">TRUST GATE STATUS</span>
+                                                <div className={`text-lg font-mono font-black mt-1 ${gateOpen ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    {gateOpen ? '● HEALTHY (PASS)' : '● AMBER (WARNINGS)'}
+                                                </div>
+                                                <span className="text-[10px] text-slate-500">Automated Repair Engine Ready</span>
+                                            </div>
+                                            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center ${gateOpen ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
+                                                <Icon name={gateOpen ? "shield-check" : "shield-alert"} size={24} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                        <div className="lg:col-span-4 glass-card p-5 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                                <h3 className="font-geist font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                                                    <Icon name="code" size={15} className="text-indigo-400" />
+                                                    Schema vs. DOM Tree Inspector
+                                                </h3>
+                                                <span className="text-[10px] font-mono text-slate-500">XPath Diff</span>
+                                            </div>
+
+                                            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs space-y-2 text-slate-300">
+                                                <div className="text-slate-500">article &gt; schema</div>
+                                                <div className="pl-3 border-l border-slate-800 space-y-1.5">
+                                                    <div className="flex items-center justify-between text-emerald-400">
+                                                        <span>├─ title: string</span>
+                                                        <span className="text-[10px]">OK</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-emerald-400">
+                                                        <span>├─ author: string</span>
+                                                        <span className="text-[10px]">OK</span>
+                                                    </div>
+                                                    <div className={`flex items-center justify-between p-1.5 rounded ${gateOpen ? 'text-emerald-400 bg-emerald-950/20' : 'text-rose-400 bg-rose-950/50 border border-rose-500/40'}`}>
+                                                        <span>└─ {selectedPreset.brokenField}: string</span>
+                                                        <span className="text-[10px] font-bold">{gateOpen ? 'PASSED' : 'NULL'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 font-mono text-xs">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block">Interactive XPath Tester:</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={customXpath}
+                                                    onChange={(e) => testXpathInPlayground(e.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-700/80 rounded p-2 text-cyan-300 text-xs focus:outline-none"
+                                                />
+                                                <div className="flex items-center justify-between text-[11px] pt-1">
+                                                    <span className="text-slate-400">Result:</span>
+                                                    <span className={xpathResult.match ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                                        {xpathResult.value}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="lg:col-span-4 glass-card p-5 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                                <h3 className="font-geist font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                                                    <Icon name="check-square" size={15} className="text-cyan-400" />
+                                                    Rule-Based Validation Suite
+                                                </h3>
+                                                <span className="text-[10px] font-mono text-slate-500">4 Assertions</span>
+                                            </div>
+
+                                            <div className="space-y-2.5">
+                                                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
+                                                    <span className="text-slate-300">Schema Type Check (string)</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${gateOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'}`}>
+                                                        {gateOpen ? 'Passed' : 'Warning'}
+                                                    </span>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
+                                                    <span className="text-slate-300">Date Format Check (ISO 8601)</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${gateOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                        {gateOpen ? 'Passed' : 'Failed'}
+                                                    </span>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
+                                                    <span className="text-slate-300">Date Range Validity</span>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">Passed</span>
+                                                </div>
+                                                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
+                                                    <span className="text-slate-300">Value Non-Null Check</span>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">Passed</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs font-mono space-y-1">
+                                                <div className="text-amber-300 font-bold flex items-center gap-1.5">
+                                                    <Icon name="alert-circle" size={14} /> SUGGESTED ACTION:
+                                                </div>
+                                                <p className="text-amber-200/80 text-[11px]">
+                                                    Auto-correcting XPath selector for field <code className="text-white font-bold">{selectedPreset.brokenField}</code> via Bright Data Scraper Studio LLM repair engine.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="lg:col-span-4 glass-card p-5 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                                <h3 className="font-geist font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                                                    <Icon name="clock" size={15} className="text-amber-400" />
+                                                    Healing Action Log Timeline
+                                                </h3>
+                                                <span className="text-[10px] font-mono text-emerald-400">Real-Time</span>
+                                            </div>
+
+                                            <div className="space-y-4 relative pl-4 border-l border-slate-800 text-xs font-mono">
+                                                <div className="relative">
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute -left-[21px] top-1"></span>
+                                                    <div className="text-slate-400 text-[10px]">14:32:01</div>
+                                                    <div className="text-rose-300 font-bold">Extraction Warning Triggered</div>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 absolute -left-[21px] top-1"></span>
+                                                    <div className="text-slate-400 text-[10px]">14:32:03</div>
+                                                    <div className="text-amber-300 font-bold">Self-Healing Loop Active</div>
+                                                    <div className="text-[10px] text-slate-400">Attempt 2/3 (XPath Auto-Repair)</div>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 absolute -left-[21px] top-1"></span>
+                                                    <div className="text-slate-400 text-[10px]">14:32:05</div>
+                                                    <div className="text-emerald-300 font-bold">Fix Applied & Verified</div>
+                                                    <div className="text-[10px] text-slate-400">Reliability updated to 98.3%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-card p-5 border border-slate-800 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-geist font-bold text-xs text-slate-200 flex items-center gap-2">
+                                                <Icon name="history" size={16} className="text-cyan-400" />
+                                                Historical Scrape Runs Time-Travel Scrubber
+                                            </h3>
+                                            <span className="text-xs font-mono text-cyan-300">Run #{historicalRun + 1} Selected</span>
+                                        </div>
+
+                                        <input 
+                                            type="range" 
+                                            min="0" 
+                                            max="9" 
+                                            value={historicalRun}
+                                            onChange={(e) => setHistoricalRun(parseInt(e.target.value))}
+                                            className="w-full h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                                        />
+
+                                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                                            <span>Run #1 (Baseline)</span>
+                                            <span>Run #5 (Warning)</span>
+                                            <span className="text-emerald-400 font-bold">Run #10 (Latest - 98.3%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ========================================================================= */}
+                            {/* VIEW 3: TRUST GATE ANALYSIS & DIVERSION VIEW                              */}
+                            {/* ========================================================================= */}
+                            {activeView === 'gate' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                                        gateOpen ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' : 'bg-rose-950/50 border-rose-500/50 text-rose-300'
+                                    }`}>
+                                        <div className="flex items-center gap-3">
+                                            <Icon name={gateOpen ? "shield-check" : "shield-alert"} size={22} className={gateOpen ? "text-emerald-400" : "text-rose-400 animate-bounce"} />
+                                            <div>
+                                                <h3 className="font-geist font-bold text-sm">
+                                                    Trust Gate Status: {gateOpen ? 'VERIFIED (PASS)' : 'DIVERTED (ALERT MODE)'}
+                                                </h3>
+                                                <p className="text-xs opacity-80">
+                                                    {gateOpen ? 'Scrape payload passed all assertions. Stream active.' : 'Untrusted scrape halted. Downstream LLMs protected.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800">
+                                            Target: {targetUrl}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                        <div className="lg:col-span-8 space-y-6">
+                                            <div className="glass-card p-6 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                                    <span className="text-xs font-mono font-bold text-slate-300">URL TRUST SCORE GAUGE</span>
+                                                    <span className="text-xs font-mono text-rose-400 font-bold">Threshold: 75.0%</span>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between text-xs font-mono">
+                                                        <span className="text-slate-400">Current Score:</span>
+                                                        <span className={scoreColor.text + " font-bold"}>{trustScore.toFixed(1)}%</span>
+                                                    </div>
+                                                    <div className="h-4 w-full bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
+                                                        <div 
+                                                            className={`h-full rounded-full transition-all duration-700 ${
+                                                                trustScore >= 75 ? 'bg-gradient-to-r from-emerald-500 to-cyan-400' : 'bg-gradient-to-r from-rose-600 to-amber-500'
+                                                            }`}
+                                                            style={{ width: `${trustScore}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2 text-xs font-mono">
+                                                    <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 text-rose-300 flex items-start gap-2">
+                                                        <Icon name="alert-triangle" size={16} className="text-rose-400 shrink-0 mt-0.5" />
+                                                        <span>⚠️ <strong>Field 'pricing_data':</strong> Integrity Drift Detected — Selector returned null.</span>
+                                                    </div>
+                                                    <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300 flex items-start gap-2">
+                                                        <Icon name="clock" size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                                                        <span>⚠️ <strong>Field 'inventory_status':</strong> Stale Data Warning — Update timestamp &gt; 48 hours ago.</span>
+                                                    </div>
+                                                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-start gap-2">
+                                                        <Icon name="file-diff" size={16} className="text-cyan-400 shrink-0 mt-0.5" />
+                                                        <span>⚠️ <strong>DOM Fingerprint Mismatch:</strong> Target container structure mutated.</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="glass-card p-6 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-geist font-bold text-xs text-slate-200 flex items-center gap-2">
+                                                        <Icon name="git-branch" size={16} className="text-indigo-400" />
+                                                        Self-Healing Fallback Pipeline Diagram
+                                                    </h3>
+                                                    <span className="text-xs font-mono text-cyan-400">Auto-Repair ETA: ~35s</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-center text-[11px] font-mono">
+                                                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                                                        <span className="text-slate-400 block text-[9px]">STEP 1</span>
+                                                        <strong className="text-slate-200">RAW INGEST</strong>
+                                                    </div>
+                                                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                                                        <span className="text-slate-400 block text-[9px]">STEP 2</span>
+                                                        <strong className="text-slate-200">CLEAN</strong>
+                                                    </div>
+                                                    <div className={`p-3 rounded-xl border ${gateOpen ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' : 'bg-rose-950/40 border-rose-500/50 text-rose-300'}`}>
+                                                        <span className="text-[9px] block">STEP 3</span>
+                                                        <strong>{gateOpen ? 'VALIDATE (OK)' : 'VALIDATE (FAIL)'}</strong>
+                                                    </div>
+                                                    <div className={`p-3 rounded-xl border ${isSimulating ? 'bg-amber-950/50 border-amber-500/50 text-amber-300 animate-pulse' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                                                        <span className="text-[9px] block">STEP 4</span>
+                                                        <strong>HEAL (XPath)</strong>
+                                                    </div>
+                                                    <div className={`p-3 rounded-xl border ${gateOpen ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                                                        <span className="text-[9px] block">STEP 5</span>
+                                                        <strong>RE-VALIDATE</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="lg:col-span-4 space-y-6">
+                                            <div className="glass-card p-6 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                                <h3 className="font-geist font-bold text-xs text-slate-200 border-b border-slate-800 pb-2">
+                                                    USER INTERVENTION ACTIONS
+                                                </h3>
+
+                                                <button 
+                                                    onClick={() => setActiveView('lab')}
+                                                    className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono font-bold text-slate-200 flex items-center justify-center gap-2"
+                                                >
+                                                    <Icon name="flask-conical" size={14} /> Review Diagnostic Lab
+                                                </button>
+
+                                                <button 
+                                                    onClick={triggerAnomalySimulation}
+                                                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                                                >
+                                                    <Icon name="refresh-cw" size={14} /> Refresh & Retry Scraping
+                                                </button>
+
+                                                <button 
+                                                    onClick={() => {
+                                                        setGateOpen(true);
+                                                        setTrustScore(76.0);
+                                                        addLog('WARN', 'User forced downstream AI execution despite warnings.');
+                                                    }}
+                                                    className="w-full py-2.5 rounded-xl bg-rose-600 text-white text-xs font-mono font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30"
+                                                >
+                                                    <Icon name="alert-triangle" size={14} /> Force Downstream AI Analysis (RISK!)
+                                                </button>
+                                            </div>
+
+                                            <div className="glass-card p-6 border border-slate-800 space-y-3 font-mono text-xs" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                                <div className="text-slate-300 font-bold border-b border-slate-800 pb-2">
+                                                    Current Verified Data Snapshot
+                                                </div>
+                                                <div className="space-y-1 text-slate-400">
+                                                    <div>product_title: <strong className="text-emerald-400">OK</strong></div>
+                                                    <div>user_reviews: <strong className="text-emerald-400">OK</strong></div>
+                                                    <div>pricing_data: <strong className={gateOpen ? "text-emerald-400" : "text-rose-400"}>{gateOpen ? "RESTORED" : "MUTATED"}</strong></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ========================================================================= */}
+                            {/* VIEW 4: TRUST-VERIFIED AI HUB + INTERACTIVE GEMINI RAG                    */}
+                            {/* ========================================================================= */}
+                            {activeView === 'hub' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="glass-card p-4 border border-slate-800 flex items-center gap-3">
+                                        <Icon name="search" size={18} className="text-cyan-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search or select your validated AI destination..."
+                                            className="w-full bg-transparent text-xs font-mono text-slate-200 outline-none placeholder:text-slate-500"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <div 
+                                            className={`p-6 rounded-2xl border transition-all ${
+                                                selectedModel === 'gemini-1.5-pro'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
+                                                    : 'glass-card border-slate-800'
+                                            }`}
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                                                    <Icon name="sparkles" size={20} />
+                                                </div>
+                                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                                    selectedModel === 'gemini-1.5-pro' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'
+                                                }`}>
+                                                    {selectedModel === 'gemini-1.5-pro' ? 'ACTIVE & SELECTED' : 'AVAILABLE'}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="font-geist font-extrabold text-base text-white">Gemini 1.5 Pro</h4>
+                                            <p className="text-xs text-slate-400 mt-1">Google DeepMind • 2M Context Window</p>
+
+                                            <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                                                <div>Latency: <strong className="text-slate-200">240ms</strong></div>
+                                                <div>Payload Safety: <strong className="text-emerald-400">100% Guaranteed</strong></div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => setSelectedModel('gemini-1.5-pro')}
+                                                className="w-full mt-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono"
+                                            >
+                                                {selectedModel === 'gemini-1.5-pro' ? '✓ Selected Destination' : 'Select Target'}
+                                            </button>
+                                        </div>
+
+                                        <div 
+                                            className={`p-6 rounded-2xl border transition-all ${
+                                                selectedModel === 'claude-3.5-sonnet'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
+                                                    : 'glass-card border-slate-800'
+                                            }`}
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                                                    <Icon name="bot" size={20} />
+                                                </div>
+                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                            </div>
+
+                                            <h4 className="font-geist font-extrabold text-base text-white">Claude 3.5 Sonnet</h4>
+                                            <p className="text-xs text-slate-400 mt-1">Anthropic • Reasoning Engine</p>
+
+                                            <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                                                <div>Latency: <strong className="text-slate-200">310ms</strong></div>
+                                                <div>Payload Safety: <strong className="text-emerald-400">100% Guaranteed</strong></div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => setSelectedModel('claude-3.5-sonnet')}
+                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                            >
+                                                Connect
+                                            </button>
+                                        </div>
+
+                                        <div 
+                                            className={`p-6 rounded-2xl border transition-all ${
+                                                selectedModel === 'gpt-4o'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
+                                                    : 'glass-card border-slate-800'
+                                            }`}
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                                                    <Icon name="zap" size={20} />
+                                                </div>
+                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                            </div>
+
+                                            <h4 className="font-geist font-extrabold text-base text-white">OpenAI GPT-4o</h4>
+                                            <p className="text-xs text-slate-400 mt-1">OpenAI • Multimodal</p>
+
+                                            <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                                                <div>Latency: <strong className="text-slate-200">280ms</strong></div>
+                                                <div>Payload Safety: <strong className="text-emerald-400">100% Guaranteed</strong></div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => setSelectedModel('gpt-4o')}
+                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                            >
+                                                Connect
+                                            </button>
+                                        </div>
+
+                                        <div 
+                                            className={`p-6 rounded-2xl border transition-all ${
+                                                selectedModel === 'mistral-large'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
+                                                    : 'glass-card border-slate-800'
+                                            }`}
+                                            onMouseMove={handleCardMouseMove}
+                                            onMouseLeave={handleCardMouseLeave}
+                                        >
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                                                    <Icon name="box" size={20} />
+                                                </div>
+                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                            </div>
+
+                                            <h4 className="font-geist font-extrabold text-base text-white">Mistral Large</h4>
+                                            <p className="text-xs text-slate-400 mt-1">Mistral AI • Open Weights</p>
+
+                                            <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                                                <div>Latency: <strong className="text-slate-200">190ms</strong></div>
+                                                <div>Payload Safety: <strong className="text-emerald-400">100% Guaranteed</strong></div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => setSelectedModel('mistral-large')}
+                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                            >
+                                                Connect
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* GEMINI RAG AI SANDBOX */}
+                                    <div className="glass-card p-6 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                            <h3 className="font-geist font-bold text-sm text-slate-200 flex items-center gap-2">
+                                                <Icon name="sparkles" size={18} className="text-emerald-400" />
+                                                Interactive Gemini 1.5 Pro RAG Synthesis Terminal
+                                            </h3>
+                                            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                                                Context: Sentinel Verified Clean Payload
+                                            </span>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                value={ragQuery}
+                                                onChange={(e) => setRagQuery(e.target.value)}
+                                                className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-2 text-xs font-mono text-slate-200 outline-none focus:border-emerald-500"
+                                            />
+                                            <button 
+                                                onClick={executeGeminiRagQuery}
+                                                disabled={isRagLoading}
+                                                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                                            >
+                                                <Icon name={isRagLoading ? "loader-2" : "send"} size={14} className={isRagLoading ? "animate-spin" : ""} />
+                                                {isRagLoading ? 'Synthesizing...' : 'Synthesize Context'}
+                                            </button>
+                                        </div>
+
+                                        {ragResponse && (
+                                            <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-300 font-mono text-xs whitespace-pre-wrap leading-relaxed shadow-inner">
+                                                {ragResponse}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                        </main>
+                    </div>
+
+                    {/* BOTTOM STEPPER NAV */}
+                    <footer className="fixed bottom-0 left-0 right-0 z-50 glass-panel border-t border-slate-800/80 px-4 py-3">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                                <button
+                                    onClick={() => { setActiveView('input'); playCyberSFX('click', soundEnabled); }}
+                                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        activeView === 'input' 
+                                            ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-lg' 
+                                            : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <div className="text-[10px] font-mono uppercase font-bold text-slate-400">Step 1</div>
+                                    <div className="text-xs font-bold truncate">Scrape Input</div>
+                                </button>
+
+                                <button
+                                    onClick={() => { setActiveView('lab'); playCyberSFX('click', soundEnabled); }}
+                                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        activeView === 'lab' 
+                                            ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg' 
+                                            : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <div className="text-[10px] font-mono uppercase font-bold text-slate-400">Step 2</div>
+                                    <div className="text-xs font-bold truncate">Diagnostic Lab</div>
+                                </button>
+
+                                <button
+                                    onClick={() => { setActiveView('gate'); playCyberSFX('click', soundEnabled); }}
+                                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        activeView === 'gate' 
+                                            ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-lg' 
+                                            : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <div className="text-[10px] font-mono uppercase font-bold text-slate-400">Step 3</div>
+                                    <div className="text-xs font-bold truncate">Trust Gate / Diversion</div>
+                                </button>
+
+                                <button
+                                    onClick={() => { setActiveView('hub'); playCyberSFX('click', soundEnabled); }}
+                                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        activeView === 'hub' 
+                                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-lg' 
+                                            : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:text-slate-200'
+                                    }`}
+                                >
+                                    <div className="text-[10px] font-mono uppercase font-bold text-slate-400">Step 4</div>
+                                    <div className="text-xs font-bold truncate">AI Destination Hub</div>
+                                </button>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
