@@ -432,6 +432,27 @@
                     "market_cap": "$3.24T",
                     "price": 128.50
                 }
+            },
+            {
+                id: 'wikipedia_article',
+                url: 'https://en.wikipedia.org/wiki/Web_scraping',
+                query: 'Summarize the article title and core content with citations to verified fields.',
+                name: 'Wikipedia Article Extract',
+                collectorId: 'c_wiki01',
+                brokenField: 'content',
+                oldSelector: '//div[@id="mw-content-text-v1"]',
+                fixedSelector: '//div[@id="mw-content-text"]',
+                sampleValue: 'Web scraping',
+                schema: {
+                    "title": {"type": "string", "required": true},
+                    "content": {"type": "string", "required": true},
+                    "source_url": {"type": "string", "required": true}
+                },
+                healthyData: {
+                    "title": "Web scraping",
+                    "content": "Web scraping is data extraction from websites.",
+                    "source_url": "https://en.wikipedia.org/wiki/Web_scraping"
+                }
             }
         ];
 
@@ -674,8 +695,15 @@
                         }
 
                         addLog('SUCCESS', `✓ Scrape executed. Sentinel Trust Score: ${data.trust_score}%. State: ${data.status}`);
+                        if (data.failure_signature && data.status !== 'AI_READY') {
+                            addLog('WARN', `Failure signature: ${data.failure_signature}`);
+                        }
+                        if (data.failed_fields && data.failed_fields.length && data.status !== 'AI_READY') {
+                            addLog('WARN', `Failed fields: ${data.failed_fields.join(', ')}`);
+                        }
                         if (data.cost_ledger && data.cost_ledger.total_cost_usd) {
-                            addLog('INFO', `💰 Cost Ledger recorded: $${data.cost_ledger.total_cost_usd.toFixed(4)} USD (${data.cost_ledger.tokens_used || 0} tokens)`);
+                            const tokens = data.cost_ledger.tokens_used || data.cost_ledger.total_tokens || 0;
+                            addLog('INFO', `💰 Cost Ledger recorded: $${data.cost_ledger.total_cost_usd.toFixed(4)} USD (${tokens} tokens)`);
                         }
                         if (isOpen) {
                             playCyberSFX('success', soundEnabled);
@@ -813,13 +841,21 @@
                     }
                 } catch (e) {}
 
-                // Fallback simulation
-                const fullText = `[GEMINI 2.5 FLASH SYNTHESIS RESPONSE]\n\n` +
-                    `✓ Trust-Verified Scrape Payload Ingested (Reliability Score: ${trustScore.toFixed(1)}%)\n` +
-                    `• Target URL: ${targetUrl}\n` +
-                    `• Verified Result: ${selectedPreset.sampleValue}\n` +
-                    `• Integrity Analysis: Zero null-pointer anomalies detected post-auto-heal. Downstream context clean and safe for agentic reasoning.\n\n` +
-                    `Status: Verified safe for Gemini 2.5 Flash Context Window.`;
+                // Fallback targeted extraction
+                const promptLower = (ragQuery || "").toLowerCase();
+                let matchedVal = selectedPreset.sampleValue;
+                if (extractedData) {
+                    if (promptLower.includes('price') && extractedData.price) matchedVal = `$${extractedData.price}`;
+                    else if (promptLower.includes('rating') && extractedData.rating) matchedVal = `${extractedData.rating} / 5.0`;
+                    else if (promptLower.includes('title') && extractedData.title) matchedVal = extractedData.title;
+                }
+
+                const fullText = `[${selectedModel.toUpperCase()} TARGETED EXTRACTION RESPONSE]\n\n` +
+                    `🎯 Query: "${ragQuery}"\n` +
+                    `✓ Extracted Specific Answer: ${matchedVal}\n` +
+                    `• Field Citation: [Field: ${selectedPreset.brokenField || 'data'}]\n` +
+                    `• Source Target: ${targetUrl}\n\n` +
+                    `💡 Integrity: Targeted extraction filtered exclusively for requested attributes. Verified clean for ${selectedModel}.`;
 
                 let i = 0;
                 const interval = setInterval(() => {
@@ -1679,12 +1715,14 @@
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        {/* Gemini Card */}
                                         <div 
-                                            className={`p-6 rounded-2xl border transition-all ${
+                                            className={`p-6 rounded-2xl border transition-all cursor-pointer ${
                                                 selectedModel.startsWith('gemini')
-                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
-                                                    : 'glass-card border-slate-800'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-emerald-950/40 to-slate-900 border-emerald-500 shadow-2xl shadow-emerald-500/10 scale-[1.02]'
+                                                    : 'glass-card border-slate-800 hover:border-slate-700'
                                             }`}
+                                            onClick={() => { setSelectedModel('gemini-2.5-flash'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Google Gemini 2.5 Flash'); }}
                                             onMouseMove={handleCardMouseMove}
                                             onMouseLeave={handleCardMouseLeave}
                                         >
@@ -1693,7 +1731,7 @@
                                                     <Icon name="sparkles" size={20} />
                                                 </div>
                                                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                                    selectedModel.startsWith('gemini') ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'
+                                                    selectedModel.startsWith('gemini') ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse' : 'bg-slate-800 text-slate-400'
                                                 }`}>
                                                     {selectedModel.startsWith('gemini') ? 'ACTIVE & SELECTED' : 'AVAILABLE'}
                                                 </span>
@@ -1708,19 +1746,23 @@
                                             </div>
 
                                             <button 
-                                                onClick={() => setSelectedModel('gemini-2.5-flash')}
-                                                className="w-full mt-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono"
+                                                onClick={(e) => { e.stopPropagation(); setSelectedModel('gemini-2.5-flash'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Google Gemini 2.5 Flash'); }}
+                                                className={`w-full mt-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+                                                    selectedModel.startsWith('gemini') ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20' : 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200'
+                                                }`}
                                             >
-                                                {selectedModel.startsWith('gemini') ? '✓ Selected Destination' : 'Select Target'}
+                                                {selectedModel.startsWith('gemini') ? '✓ Active Destination' : 'Select Target'}
                                             </button>
                                         </div>
 
+                                        {/* Claude Card */}
                                         <div 
-                                            className={`p-6 rounded-2xl border transition-all ${
+                                            className={`p-6 rounded-2xl border transition-all cursor-pointer ${
                                                 selectedModel === 'claude-3.5-sonnet'
-                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
-                                                    : 'glass-card border-slate-800'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-indigo-500 shadow-2xl shadow-indigo-500/10 scale-[1.02]'
+                                                    : 'glass-card border-slate-800 hover:border-slate-700'
                                             }`}
+                                            onClick={() => { setSelectedModel('claude-3.5-sonnet'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Anthropic Claude 3.5 Sonnet'); }}
                                             onMouseMove={handleCardMouseMove}
                                             onMouseLeave={handleCardMouseLeave}
                                         >
@@ -1728,7 +1770,11 @@
                                                 <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
                                                     <Icon name="bot" size={20} />
                                                 </div>
-                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 animate-pulse' : 'bg-slate-800 text-slate-400'
+                                                }`}>
+                                                    {selectedModel === 'claude-3.5-sonnet' ? 'ACTIVE & SELECTED' : 'AVAILABLE'}
+                                                </span>
                                             </div>
 
                                             <h4 className="font-geist font-extrabold text-base text-white">Claude 3.5 Sonnet</h4>
@@ -1740,19 +1786,23 @@
                                             </div>
 
                                             <button 
-                                                onClick={() => setSelectedModel('claude-3.5-sonnet')}
-                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                                onClick={(e) => { e.stopPropagation(); setSelectedModel('claude-3.5-sonnet'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Anthropic Claude 3.5 Sonnet'); }}
+                                                className={`w-full mt-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'bg-indigo-500 hover:bg-indigo-400 text-slate-950 shadow-lg shadow-indigo-500/20' : 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200'
+                                                }`}
                                             >
-                                                Connect
+                                                {selectedModel === 'claude-3.5-sonnet' ? '✓ Active Destination' : 'Select Target'}
                                             </button>
                                         </div>
 
+                                        {/* GPT-4o Card */}
                                         <div 
-                                            className={`p-6 rounded-2xl border transition-all ${
+                                            className={`p-6 rounded-2xl border transition-all cursor-pointer ${
                                                 selectedModel === 'gpt-4o'
-                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
-                                                    : 'glass-card border-slate-800'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-cyan-950/40 to-slate-900 border-cyan-500 shadow-2xl shadow-cyan-500/10 scale-[1.02]'
+                                                    : 'glass-card border-slate-800 hover:border-slate-700'
                                             }`}
+                                            onClick={() => { setSelectedModel('gpt-4o'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to OpenAI GPT-4o'); }}
                                             onMouseMove={handleCardMouseMove}
                                             onMouseLeave={handleCardMouseLeave}
                                         >
@@ -1760,11 +1810,15 @@
                                                 <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
                                                     <Icon name="zap" size={20} />
                                                 </div>
-                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                                    selectedModel === 'gpt-4o' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 animate-pulse' : 'bg-slate-800 text-slate-400'
+                                                }`}>
+                                                    {selectedModel === 'gpt-4o' ? 'ACTIVE & SELECTED' : 'AVAILABLE'}
+                                                </span>
                                             </div>
 
                                             <h4 className="font-geist font-extrabold text-base text-white">OpenAI GPT-4o</h4>
-                                            <p className="text-xs text-slate-400 mt-1">OpenAI • Multimodal</p>
+                                            <p className="text-xs text-slate-400 mt-1">OpenAI • Multimodal Reasoning</p>
 
                                             <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
                                                 <div>Latency: <strong className="text-slate-200">280ms</strong></div>
@@ -1772,19 +1826,23 @@
                                             </div>
 
                                             <button 
-                                                onClick={() => setSelectedModel('gpt-4o')}
-                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                                onClick={(e) => { e.stopPropagation(); setSelectedModel('gpt-4o'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to OpenAI GPT-4o'); }}
+                                                className={`w-full mt-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+                                                    selectedModel === 'gpt-4o' ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20' : 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200'
+                                                }`}
                                             >
-                                                Connect
+                                                {selectedModel === 'gpt-4o' ? '✓ Active Destination' : 'Select Target'}
                                             </button>
                                         </div>
 
+                                        {/* Mistral Card */}
                                         <div 
-                                            className={`p-6 rounded-2xl border transition-all ${
+                                            className={`p-6 rounded-2xl border transition-all cursor-pointer ${
                                                 selectedModel === 'mistral-large'
-                                                    ? 'bg-gradient-to-b from-slate-900 via-indigo-950/40 to-slate-900 border-emerald-500/80 shadow-2xl'
-                                                    : 'glass-card border-slate-800'
+                                                    ? 'bg-gradient-to-b from-slate-900 via-purple-950/40 to-slate-900 border-purple-500 shadow-2xl shadow-purple-500/10 scale-[1.02]'
+                                                    : 'glass-card border-slate-800 hover:border-slate-700'
                                             }`}
+                                            onClick={() => { setSelectedModel('mistral-large'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Mistral Large'); }}
                                             onMouseMove={handleCardMouseMove}
                                             onMouseLeave={handleCardMouseLeave}
                                         >
@@ -1792,11 +1850,15 @@
                                                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
                                                     <Icon name="box" size={20} />
                                                 </div>
-                                                <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">AVAILABLE</span>
+                                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                                    selectedModel === 'mistral-large' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 animate-pulse' : 'bg-slate-800 text-slate-400'
+                                                }`}>
+                                                    {selectedModel === 'mistral-large' ? 'ACTIVE & SELECTED' : 'AVAILABLE'}
+                                                </span>
                                             </div>
 
                                             <h4 className="font-geist font-extrabold text-base text-white">Mistral Large</h4>
-                                            <p className="text-xs text-slate-400 mt-1">Mistral AI • Open Weights</p>
+                                            <p className="text-xs text-slate-400 mt-1">Mistral AI • Open Weights Architecture</p>
 
                                             <div className="mt-4 pt-4 border-t border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
                                                 <div>Latency: <strong className="text-slate-200">190ms</strong></div>
@@ -1804,20 +1866,38 @@
                                             </div>
 
                                             <button 
-                                                onClick={() => setSelectedModel('mistral-large')}
-                                                className="w-full mt-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs font-mono"
+                                                onClick={(e) => { e.stopPropagation(); setSelectedModel('mistral-large'); playCyberSFX('click', soundEnabled); addLog('INFO', 'AI Destination switched to Mistral Large'); }}
+                                                className={`w-full mt-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+                                                    selectedModel === 'mistral-large' ? 'bg-purple-500 hover:bg-purple-400 text-slate-950 shadow-lg shadow-purple-500/20' : 'bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200'
+                                                }`}
                                             >
-                                                Connect
+                                                {selectedModel === 'mistral-large' ? '✓ Active Destination' : 'Select Target'}
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* GEMINI RAG AI SANDBOX */}
+                                    {/* DYNAMIC MULTI-MODEL AI SYNTHESIS SANDBOX */}
                                     <div className="glass-card p-6 border border-slate-800 space-y-4" onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
                                         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                                             <h3 className="font-geist font-bold text-sm text-slate-200 flex items-center gap-2">
-                                                <Icon name="sparkles" size={18} className="text-emerald-400" />
-                                                Interactive Gemini Context Synthesis Terminal
+                                                <Icon 
+                                                    name={
+                                                        selectedModel === 'claude-3.5-sonnet' ? 'bot' :
+                                                        selectedModel === 'gpt-4o' ? 'zap' :
+                                                        selectedModel === 'mistral-large' ? 'box' : 'sparkles'
+                                                    } 
+                                                    size={18} 
+                                                    className={
+                                                        selectedModel === 'claude-3.5-sonnet' ? 'text-indigo-400' :
+                                                        selectedModel === 'gpt-4o' ? 'text-cyan-400' :
+                                                        selectedModel === 'mistral-large' ? 'text-purple-400' : 'text-emerald-400'
+                                                    } 
+                                                />
+                                                Interactive {
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'Anthropic Claude 3.5 Sonnet' :
+                                                    selectedModel === 'gpt-4o' ? 'OpenAI GPT-4o' :
+                                                    selectedModel === 'mistral-large' ? 'Mistral Large' : 'Google Gemini 2.5 Flash'
+                                                } Synthesis Terminal
                                             </h3>
                                             <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">
                                                 Context: Sentinel Verified Clean Payload
@@ -1829,15 +1909,28 @@
                                                 type="text" 
                                                 value={ragQuery}
                                                 onChange={(e) => setRagQuery(e.target.value)}
+                                                placeholder={`Ask ${
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'Claude' :
+                                                    selectedModel === 'gpt-4o' ? 'GPT-4o' :
+                                                    selectedModel === 'mistral-large' ? 'Mistral' : 'Gemini'
+                                                } to extract specific verified fields...`}
                                                 className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-2 text-xs font-mono text-slate-200 outline-none focus:border-emerald-500"
                                             />
                                             <button 
                                                 onClick={executeGeminiRagQuery}
                                                 disabled={isRagLoading}
-                                                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                                                className={`px-5 py-2 rounded-xl text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg transition-all ${
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'bg-indigo-400 hover:bg-indigo-300 shadow-indigo-500/20' :
+                                                    selectedModel === 'gpt-4o' ? 'bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20' :
+                                                    selectedModel === 'mistral-large' ? 'bg-purple-400 hover:bg-purple-300 shadow-purple-500/20' : 'bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20'
+                                                }`}
                                             >
                                                 <Icon name={isRagLoading ? "loader-2" : "send"} size={14} className={isRagLoading ? "animate-spin" : ""} />
-                                                {isRagLoading ? 'Synthesizing...' : 'Synthesize Context'}
+                                                {isRagLoading ? 'Synthesizing...' : `Synthesize with ${
+                                                    selectedModel === 'claude-3.5-sonnet' ? 'Claude' :
+                                                    selectedModel === 'gpt-4o' ? 'GPT-4o' :
+                                                    selectedModel === 'mistral-large' ? 'Mistral' : 'Gemini'
+                                                }`}
                                             </button>
                                         </div>
 
